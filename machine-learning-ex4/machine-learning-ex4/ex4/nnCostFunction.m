@@ -1,0 +1,151 @@
+function [J grad] = nnCostFunction(nn_params, ...
+                                   input_layer_size, ...
+                                   hidden_layer_size, ...
+                                   num_labels, ...
+                                   X, y, lambda)
+%NNCOSTFUNCTION Implements the neural network cost function for a two layer
+%neural network which performs classification
+%   [J grad] = NNCOSTFUNCTON(nn_params, hidden_layer_size, num_labels, ...
+%   X, y, lambda) computes the cost and gradient of the neural network. The
+%   parameters for the neural network are "unrolled" into the vector
+%   nn_params and need to be converted back into the weight matrices. 
+% 
+%   The returned parameter grad should be a "unrolled" vector of the
+%   partial derivatives of the neural network.
+%
+
+% Reshape nn_params back into the parameters Theta1 and Theta2, the weight matrices
+% for our 2 layer neural network
+Theta1 = reshape(nn_params(1:hidden_layer_size * (input_layer_size + 1)), ...
+                 hidden_layer_size, (input_layer_size + 1));
+
+Theta2 = reshape(nn_params((1 + (hidden_layer_size * (input_layer_size + 1))):end), ...
+                 num_labels, (hidden_layer_size + 1));
+
+% Setup some useful variables
+m = size(X, 1);
+         
+% You need to return the following variables correctly 
+J = 0;
+Theta1_grad = zeros(size(Theta1));
+Theta2_grad = zeros(size(Theta2));
+
+% ====================== YOUR CODE HERE ======================
+% Instructions: You should complete the code by working through the
+%               following parts.
+%
+% Part 1: Feedforward the neural network and return the cost in the
+%         variable J. After implementing Part 1, you can verify that your
+%         cost function computation is correct by verifying the cost
+%         computed in ex4.m
+%
+% Part 2: Implement the backpropagation algorithm to compute the gradients
+%         Theta1_grad and Theta2_grad. You should return the partial derivatives of
+%         the cost function with respect to Theta1 and Theta2 in Theta1_grad and
+%         Theta2_grad, respectively. After implementing Part 2, you can check
+%         that your implementation is correct by running checkNNGradients
+%
+%         Note: The vector y passed into the function is a vector of labels
+%               containing values from 1..K. You need to map this vector into a 
+%               binary vector of 1's and 0's to be used with the neural network
+%               cost function.
+%
+%         Hint: We recommend implementing backpropagation using a for-loop
+%               over the training examples if you are implementing it for the 
+%               first time.
+%
+% Part 3: Implement regularization with the cost function and gradients.
+%
+%         Hint: You can implement this around the code for
+%               backpropagation. That is, you can compute the gradients for
+%               the regularization separately and then add them to Theta1_grad
+%               and Theta2_grad from Part 2.
+%
+
+% Implementing forward propogation
+A1 = [ones(m, 1) X];
+Z2 = Theta1*A1';
+A2 = sigmoid(Z2);
+A2 = [ones(m,1) A2'];
+Z3 = Theta2*A2';
+A3 = sigmoid(Z3);
+A3 = A3'; 
+
+y_matrix = eye(num_labels)(y,:);
+% first_term = -(y_matrix'*log(A3)); % 10 X 10 matrix
+% second_term = -(1 - y_matrix)'*log(1 - A3);  % 10 X 10 matrix
+
+first_term = -(y_matrix .* log(A3)); % 5000 X 10
+second_term = -(1 - y_matrix) .* log(1 - A3); % 5000 X 10
+mat = (first_term + second_term) / m; % 5000 X 10 matrix
+J = sum(sum(mat)); % 1 X 1 as J should be scaler
+
+% Regularizing the cost function
+Theta1_without_bias = Theta1(:,2:end);
+cof = lambda/(2*m);
+reg_term_1 = sum(sum(Theta1_without_bias .^ 2));
+
+Theta2_without_bias = Theta2(:,2:end);
+reg_term_2 = sum(sum(Theta2_without_bias .^ 2));
+
+reg_total = cof * (reg_term_1 + reg_term_2);
+
+J = J + reg_total;
+
+% Calculating gradient using back propogation algorithm
+X = [ones(m, 1) X];
+Delta1 = zeros(size(Theta1));
+Delta2 = zeros(size(Theta2));
+for t = 1:m
+  a1 = X(t,:);
+  % fprintf("\nSize of a1 is %d X %d",size(a1,1),size(a1,2));
+  z2 = Theta1*a1';
+  % fprintf("\nSize of z2 is %d X %d",size(z2,1),size(z2,2));
+  a2 = sigmoid(z2);
+  % fprintf("\nSize of a2 is %d X %d",size(a2,1),size(a2,2));
+  a2 = [1 a2'];
+  % fprintf("\nSize of a2 is %d X %d",size(a2,1),size(a2,2));
+  z3 = Theta2*a2';
+  % fprintf("\nSize of z3 is %d X %d",size(z3,1),size(z3,2));
+  a3 = sigmoid(z3);
+  % fprintf("\nSize of a3 is %d X %d",size(a3,1),size(a3,2));
+  a3 = a3';
+  % fprintf("\nSize of a3 is %d X %d",size(a3,1),size(a3,2));
+  
+  y_tth = y_matrix(t,:);
+  % fprintf("\nSize of y_tth is %d X %d",size(y_tth,1),size(y_tth,2));
+  delta3 = a3 - y_tth;
+  % fprintf("\nSize of delta3 is %d X %d",size(delta3,1),size(delta3,2));
+  
+  delta2 = (delta3*Theta2).*[1 sigmoidGradient(z2)'];
+  % fprintf("\nSize of delta2 is %d X %d",size(delta2,1),size(delta2,2));
+  delta2 = delta2(2:end);
+  % fprintf("\nSize of delta2 is %d X %d",size(delta2,1),size(delta2,2));
+  
+  Delta1 = Delta1 + delta2'*a1;
+  % fprintf("\nSize of Delta1 is %d X %d",size(Delta1,1),size(Delta1,2));
+  Delta2 = Delta2 + delta3'*a2;
+  % fprintf("\nSize of Delta2 is %d X %d",size(Delta2,1),size(Delta2,2));
+endfor  
+Theta1_grad = Delta1/m;
+% fprintf("\nSize of Theta1_grad is %d X %d",size(Theta1_grad,1),size(Theta1_grad,2));
+Theta2_grad = Delta2/m;
+% fprintf("\nSize of Theta2_grad is %d X %d",size(Theta2_grad,1),size(Theta2_grad,2));
+
+Theta1_grad_removed_bias = Theta1_grad(:,2:end);
+Theta1_grad_removed_bias = Theta1_grad_removed_bias + (lambda/m)*Theta1(:,2:end);
+Theta1_grad = [Theta1_grad(:,1) Theta1_grad_removed_bias];
+
+Theta2_grad_removed_bias = Theta2_grad(:,2:end);
+Theta2_grad_removed_bias = Theta2_grad_removed_bias + (lambda/m)*Theta2(:,2:end);
+Theta2_grad = [Theta2_grad(:,1) Theta2_grad_removed_bias];
+
+% -------------------------------------------------------------
+
+% =========================================================================
+
+% Unroll gradients
+grad = [Theta1_grad(:) ; Theta2_grad(:)];
+
+
+end
